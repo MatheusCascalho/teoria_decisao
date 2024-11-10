@@ -63,6 +63,11 @@ class history:
     def best_solution(self):
         return self.sol[-1]
 
+    @property
+    def is_stable(self):
+        n_sol = len(self.sol)
+        min_stabel = int(n_sol*0.2)
+        return n_sol>=200 and all(s.fitness_penalizado == self.sol[-1].fitness_penalizado for s in self.sol[-min_stabel:])
 
 '''
 Implementa uma solução inicial para o problema
@@ -126,7 +131,7 @@ def shake(x: solution, k: int, prob_def: problem_definition):
     r_equipe = np.random.randint(prob_def.n_equipes)
     r_ativo = np.random.randint(prob_def.n_ativos)
 
-    # trocando equipe de base
+    # trocando equipe de base - 3 vizinhos
     if k == 1:
         # y.solution[r[0]] = not(y.solution[r[0]])
         if y.equipe_base[r_equipe] == prob_def.n_bases - 1:
@@ -134,14 +139,14 @@ def shake(x: solution, k: int, prob_def: problem_definition):
         else:
             y.equipe_base[r_equipe] += 1
 
-    # trocando ativo de equipe
+    # trocando ativo de equipe - 125 vizinhos
     elif k == 2:
         if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
             y.ativo_equipe[r_ativo] = 0
         else:
             y.ativo_equipe[r_ativo] += 1
 
-    # trocando ativo de equipe e equipe de base
+    # trocando ativo de equipe e equipe de base - 1.953.125 vizinhos
     elif k == 3:
         if y.equipe_base[r_equipe] == prob_def.n_bases - 1:
             y.equipe_base[r_equipe] = 0
@@ -153,6 +158,25 @@ def shake(x: solution, k: int, prob_def: problem_definition):
             y.ativo_equipe[r_ativo] += 1
 
     return y
+
+
+def first_improvement(x: solution, k: int, objective_function: callable, prob_def, max_iteration=2e6):
+    current_fitness = objective_function(x, prob_def).fitness_penalizado
+    neighbor_fitness = np.inf
+    it = 0
+    max_neighbors = {
+        1:3,
+        2:125,
+        3:20#1.9e6
+    }
+    while neighbor_fitness > current_fitness and it < max_iteration:
+        neighbor = shake(x, k, prob_def)
+        neighbor_fitness = objective_function(neighbor, prob_def).fitness_penalizado
+        it += 1
+        if it > max_neighbors[k]:
+            neighbor = x
+            break
+    return neighbor
 
 
 '''
@@ -185,6 +209,35 @@ def RVNS(prob_def, initial_solution, objective_function, max_iteration, historic
             # Armazena dados para plot
             historico.update(current_solution)
     return historico
+
+def BasicVNS(prob_def, initial_solution, objective_function, max_iteration, historico, kmax=3):
+    it = 0
+    current_solution = initial_solution
+    # Ciclo iterativo do método
+    while it <= max_iteration:
+        k = 1
+        while k < kmax:
+            # Gera uma solução candidata na k-ésima vizinhança de x
+            new_solution = first_improvement(
+                x=current_solution,
+                k=k,
+                objective_function=objective_function,
+                prob_def=prob_def
+            )
+            new_solution = objective_function(new_solution, prob_def)
+            it += 1
+
+            # Atualiza solução corrente e estrutura de vizinhança (se necessário)
+            current_solution, k = neighborhoodChange(current_solution, new_solution, k)
+
+            # Armazena dados para plot
+            historico.update(current_solution)
+
+        if historico.is_stable:
+            break
+    return historico
+
+
 
 def get_problem_definition():
     data = pd.read_csv("probdata.csv", delimiter=";", header=None, decimal=',', names=[
