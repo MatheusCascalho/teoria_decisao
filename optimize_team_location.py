@@ -334,7 +334,7 @@ if __name__=="__main__":
         prob_def = get_problem_definition()
 
         # Gera solução inicial
-        x = sol_inicial(prob_def, apply_constructive_heuristic=True)
+        x = sol_inicial(prob_def, apply_constructive_heuristic=True, use_random=False)
 
         # Avalia solução inicial
         x = minimiza_distancias(x, prob_def)
