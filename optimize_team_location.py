@@ -7,6 +7,8 @@ Importa os módulos usados
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+from sklearn.cluster import KMeans
+
 
 '''
 Define um tipo de dado similar ao Pascal "record" or C "struct"
@@ -72,7 +74,7 @@ class history:
 '''
 Implementa uma solução inicial para o problema
 '''
-def sol_inicial(prob_def: problem_definition, apply_constructive_heuristic=False):
+def sol_inicial(prob_def: problem_definition, apply_constructive_heuristic=True, use_random=True):
     '''
     Modelou-se uma solução x como um vetor binário
 
@@ -84,8 +86,54 @@ def sol_inicial(prob_def: problem_definition, apply_constructive_heuristic=False
         y = np.random.randint(0, prob_def.n_bases, size=prob_def.n_equipes)
         h = np.random.randint(0, prob_def.n_equipes, size=prob_def.n_ativos)
         sol = solution(equipe_base=y, ativo_equipe=h)
-    else:  # TODO
-        pass
+    else:
+        # Definindo base das equipes
+        inverse_ativo_map = {v: k for k, v in prob_def.ativo_map.items()}
+        df = pd.DataFrame(inverse_ativo_map).T
+        df.columns = ['latitude', 'longitude']
+        df['type'] = 'ativo'
+
+        inverse_base_map = {v: k for k, v in prob_def.base_map.items()}
+        df_base = pd.DataFrame(inverse_base_map).T
+        df_base.columns = ['latitude', 'longitude']
+        df_base['type'] = 'base'
+        df = pd.concat([df, df_base])
+
+        kmeans = KMeans(n_clusters=3, random_state=0)
+        kmeans.fit(df[['latitude', 'longitude']])
+
+        # Adicionando a coluna de labels ao DataFrame
+        df['cluster'] = kmeans.labels_
+
+        # Obtendo os centróides
+        centroids = kmeans.cluster_centers_
+        # Encontrando o ponto mais próximo de cada centróide
+        equipe_base = []
+        ativos_equipe = np.zeros(prob_def.n_ativos)
+        bases = df[df['type']=='base'].reset_index()
+        for i, centroid in enumerate(centroids):
+            # Filtrar apenas os pontos do cluster atual
+            cluster_points = bases[bases['cluster'] == i]
+            if not use_random:
+                # Calcular a distância de cada ponto ao centróide atual
+                distances = np.sqrt(
+                    (cluster_points['latitude'] - centroid[0]) ** 2 + (cluster_points['longitude'] - centroid[1]) ** 2)
+
+                # Obter o índice do ponto mais próximo
+                closest_index = distances.idxmin()
+            else:
+                closest_index = list(cluster_points.index)[np.random.randint(len(cluster_points))]
+
+            # Adicionar o ponto mais próximo à lista
+            equipe_base.append(closest_index)
+            ativos = df[(df['type'] == 'ativo')&(df['cluster'] == i)].index
+            ativos_equipe[ativos] = i
+
+        sol = solution(
+            ativo_equipe=list(ativos_equipe.astype(int)),
+            equipe_base=equipe_base
+        )
+
     return sol
 
 
@@ -286,7 +334,7 @@ if __name__=="__main__":
         prob_def = get_problem_definition()
 
         # Gera solução inicial
-        x = sol_inicial(prob_def, apply_constructive_heuristic=False)
+        x = sol_inicial(prob_def, apply_constructive_heuristic=True)
 
         # Avalia solução inicial
         x = minimiza_distancias(x, prob_def)
