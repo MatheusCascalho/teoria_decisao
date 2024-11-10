@@ -271,62 +271,36 @@ def get_problem_definition():
 
 if __name__=="__main__":
 
-    # Contador do número de soluções candidatas avaliadas
-    num_sol_avaliadas = 0
+    historicos = []
+    for _ in range(3):
+        # Contador do número de soluções candidatas avaliadas
+        num_sol_avaliadas = 0
 
-    # Máximo número de soluções candidatas avaliadas
-    max_num_sol_avaliadas = 10000
+        # Máximo número de soluções candidatas avaliadas
+        max_num_sol_avaliadas = 5000
 
-    # Número de estruturas de vizinhanças definidas
-    kmax = 3
+        # Número de estruturas de vizinhanças definidas
+        kmax = 3
 
-    # Faz a leitura dos dados da instância do problema
-    prob_def = get_problem_definition()
+        # Faz a leitura dos dados da instância do problema
+        prob_def = get_problem_definition()
 
-    # Gera solução inicial
-    x = sol_inicial(prob_def, apply_constructive_heuristic=False)
+        # Gera solução inicial
+        x = sol_inicial(prob_def, apply_constructive_heuristic=False)
 
-    # Avalia solução inicial
-    x = minimiza_distancias(x, prob_def)
-    num_sol_avaliadas += 1
+        # Avalia solução inicial
+        x = minimiza_distancias(x, prob_def)
+        num_sol_avaliadas += 1
 
-    # Armazena dados para plot
-    historico = history()
-    historico.update(x)
+        # Armazena dados para plot
+        historico = history()
+        historico.update(x)
 
-    historico = RVNS(
-        initial_solution=x,
-        objective_function=minimiza_distancias,
-        max_iteration=max_num_sol_avaliadas,
-        historico=historico
-    )
-
-    # print('\n--- SOLUÇÃO INICIAL CONSTRUÍDA ---\n')
-    # print('Identificação dos projetos selecionados:\n')
-    # print('x = {}\n'.format(historico.sol[0]))
-    # print('fitness(x) = {:.2f}\n'.format(historico.fit[0]))
-    # print('fitness(x) penalizado = {:.2f}\n'.format(historico.fit_pen[0]))
-    # print('penalidade(x) = {:.2f}\n'.format(historico.pen[0]))
-
-    # print('\n--- MELHOR SOLUÇÃO ENCONTRADA ---\n')
-    # print('Identificação dos projetos selecionados:\n')
-    # print('x = {}\n'.format(x.ativo_base))
-    # print('fitness(x) = {:.2f}\n'.format(x.fitness))
-    # print('fitness(x) penalizado = {:.2f}\n'.format(x.fitness_penalizado))
-    # print('penalidade(x) = {:.2f}\n'.format(x.penalidade))
-
-    fig, (ax1, ax2) = plt.subplots(2, 1)
-    s = len(historico.fit_pen)
-    ax1.plot(np.linspace(0, s - 1, s), historico.fit_pen, 'k-')
-    ax2.plot(np.linspace(0, s - 1, s), historico.pen, 'b:')
-    fig.suptitle('Evolução da qualidade da solução candidata')
-    ax1.set_ylabel('fitness(x) penalizado')
-    ax2.set_ylabel('penalidade(x)')
-    ax2.set_xlabel('Número de avaliações')
-    plt.subplots_adjust(left=0.1,
-                        bottom=0.1,
-                        right=0.9,
-                        top=0.9,
-                        wspace=0.4,
-                        hspace=0.4)
-    plt.show()
+        historico = BasicVNS(
+            prob_def=prob_def,
+            initial_solution=x,
+            objective_function=minimiza_distancias,
+            max_iteration=max_num_sol_avaliadas,
+            historico=historico
+        )
+        historicos.append(historico)
