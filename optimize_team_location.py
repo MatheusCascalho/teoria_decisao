@@ -326,6 +326,40 @@ def get_problem_definition():
     return prob_def
 
 
+def optimize(fobj, apply_constructive_heuristic=False):
+    historicos = []
+    for _ in range(5):
+        # Contador do número de soluções candidatas avaliadas
+        num_sol_avaliadas = 0
+
+        # Máximo número de soluções candidatas avaliadas
+        max_num_sol_avaliadas = 40e3
+
+        # Faz a leitura dos dados da instância do problema
+        prob_def = get_problem_definition()
+
+        # Gera solução inicial
+        x = sol_inicial(prob_def, apply_constructive_heuristic=apply_constructive_heuristic)
+
+        # Avalia solução inicial
+        x = fobj(x, prob_def)
+        num_sol_avaliadas += 1
+
+        # Armazena dados para plot
+        historico = history()
+        historico.update(x)
+
+        historico = BasicVNS(
+            prob_def=prob_def,
+            initial_solution=x,
+            objective_function=fobj,
+            max_iteration=max_num_sol_avaliadas,
+            historico=historico
+        )
+        historicos.append(historico)
+    return historicos
+
+
 if __name__=="__main__":
 
     historicos = []
