@@ -37,7 +37,10 @@ class solution:
     equipe_base: list # y
     fitness: float = 0
     penalidade: float = 0
-    fitness_penalizado: float = 0
+
+    @property
+    def fitness_penalizado(self):
+        return self.penalidade + self.fitness
 
     @property
     def ativo_base(self):
@@ -136,6 +139,25 @@ def sol_inicial(prob_def: problem_definition, apply_constructive_heuristic=True,
 
     return sol
 
+def get_penalidade(x: solution, prob_def: problem_definition):
+    ativos_por_equipe = [len(np.where(np.array(x.ativo_equipe) == k)[0]) for k in range(prob_def.n_equipes)]
+    penalidade = 0
+    min_ativos = prob_def.ETA * prob_def.n_ativos / prob_def.n_equipes
+    # print(f"Minimo de ativos:{min_ativos}")
+    u = 100
+    for equipe, qtd_ativos in enumerate(ativos_por_equipe):
+        g = min_ativos - qtd_ativos
+        # print(f"Qtd. Ativos: {qtd_ativos} \t G: {g}")
+        penalidade += u * max(0, g) ** 2
+    return penalidade
+
+def equilibrio_ativos(x: solution, prob_def: problem_definition):
+    ativos_por_equipe = [len(np.where(np.array(x.ativo_equipe) == k)[0]) for k in range(prob_def.n_equipes)]
+
+    x.fitness = max(ativos_por_equipe) - min(ativos_por_equipe)
+    x.penalidade = get_penalidade(x, prob_def)
+
+    return x
 
 '''
 Implementa a função objetivo do problema
@@ -153,20 +175,7 @@ def minimiza_distancias(x: solution, prob_def: problem_definition):
 
     x.fitness = total_distance
 
-    # print(total_distance)
-    ativos_por_equipe = [len(np.where(np.array(x.ativo_equipe) == k)[0]) for k in range(prob_def.n_equipes)]
-    penalidade = 0
-    min_ativos = prob_def.ETA * prob_def.n_ativos / prob_def.n_equipes
-    # print(f"Minimo de ativos:{min_ativos}")
-    u = 100
-    for equipe, qtd_ativos in enumerate(ativos_por_equipe):
-        g = min_ativos - qtd_ativos
-        # print(f"Qtd. Ativos: {qtd_ativos} \t G: {g}")
-        penalidade += u * max(0, g) ** 2
-
-    x.penalidade = penalidade
-    x.fitness_penalizado = total_distance + penalidade
-    # print(ativos_por_equipe)
+    x.penalidade = get_penalidade(x, prob_def)
 
     return x
 
@@ -337,7 +346,7 @@ if __name__=="__main__":
         x = sol_inicial(prob_def, apply_constructive_heuristic=True, use_random=False)
 
         # Avalia solução inicial
-        x = minimiza_distancias(x, prob_def)
+        x = equilibrio_ativos(x, prob_def)
         num_sol_avaliadas += 1
 
         # Armazena dados para plot
@@ -347,7 +356,7 @@ if __name__=="__main__":
         historico = BasicVNS(
             prob_def=prob_def,
             initial_solution=x,
-            objective_function=minimiza_distancias,
+            objective_function=equilibrio_ativos,
             max_iteration=max_num_sol_avaliadas,
             historico=historico
         )
