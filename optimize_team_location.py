@@ -191,7 +191,7 @@ Implementa a função shake
 def shake(x: solution, k: int, prob_def: problem_definition):
     y = copy.deepcopy(x)
     r_equipe = np.random.randint(prob_def.n_equipes)
-    r_ativo = np.random.randint(prob_def.n_ativos)
+    r_ativos = np.random.permutation(prob_def.n_ativos)
 
     # trocando equipe de base - 3 vizinhos
     if k == 1:
@@ -203,10 +203,15 @@ def shake(x: solution, k: int, prob_def: problem_definition):
 
     # trocando ativo de equipe - 125 vizinhos
     elif k == 2:
-        if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
-            y.ativo_equipe[r_ativo] = 0
-        else:
-            y.ativo_equipe[r_ativo] += 1
+        # worst_distances = np.where(prob_def.distance_matrix.loc[:,y.equipe_base] == prob_def.distance_matrix.loc[:,y.equipe_base].max())
+        # ativos, bases = worst_distances
+        for i, r_ativo in enumerate(r_ativos):
+            if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
+                y.ativo_equipe[r_ativo] = 0
+            else:
+                y.ativo_equipe[r_ativo] += 1
+            if i >= 10:
+                break
 
     # trocando ativo de equipe e equipe de base - 1.953.125 vizinhos
     elif k == 3:
@@ -214,11 +219,25 @@ def shake(x: solution, k: int, prob_def: problem_definition):
             y.equipe_base[r_equipe] = 0
         else:
             y.equipe_base[r_equipe] += 1
-        if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
-            y.ativo_equipe[r_ativo] = 0
-        else:
-            y.ativo_equipe[r_ativo] += 1
+        for i, r_ativo in enumerate(r_ativos):
+            if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
+                y.ativo_equipe[r_ativo] = 0
+            else:
+                y.ativo_equipe[r_ativo] += 1
+            if i >= 30:
+                break
 
+    # trocando ativo de equipe e equipe de base - 1.953.125 vizinhos
+    elif k == 4:
+        for equipe, base in enumerate(y.equipe_base):
+            y.equipe_base[equipe] = np.random.randint(prob_def.n_bases)
+        for i, r_ativo in enumerate(r_ativos):
+            if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
+                y.ativo_equipe[r_ativo] = 0
+            else:
+                y.ativo_equipe[r_ativo] += 1
+            if i >= 30:
+                break
     return y
 
 
@@ -229,7 +248,8 @@ def first_improvement(x: solution, k: int, objective_function: callable, prob_de
     max_neighbors = {
         1:3,
         2:125,
-        3:20#1.9e6
+        3:50, #1.9e6
+        4:50
     }
     while neighbor_fitness > current_fitness and it < max_iteration:
         neighbor = shake(x, k, prob_def)
