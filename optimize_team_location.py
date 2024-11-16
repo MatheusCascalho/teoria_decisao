@@ -43,7 +43,7 @@ class solution:
         return self.penalidade + self.fitness
 
     @property
-    def ativo_base(self):
+    def ativo_base(self): # x
         x = []
         for equipe in self.ativo_equipe:
             base = self.equipe_base[equipe]
@@ -53,6 +53,7 @@ class solution:
 
 @dataclass
 class history:
+    min_iterations: int
     fit: list = field(default_factory=list)
     sol: list = field(default_factory=list)
     pen: list = field(default_factory=list)
@@ -72,7 +73,11 @@ class history:
     def is_stable(self):
         n_sol = len(self.sol)
         min_stabel = int(n_sol*0.2)
-        return n_sol>=200 and all(s.fitness_penalizado == self.sol[-1].fitness_penalizado for s in self.sol[-min_stabel:])
+        return n_sol>=self.min_iterations and all(s.fitness_penalizado == self.sol[-1].fitness_penalizado for s in self.sol[-min_stabel:])
+
+    @property
+    def is_locked(self):
+        return len(self.sol) > 20 and  all(s.fitness_penalizado == self.sol[-1].fitness_penalizado for s in self.sol[-20:])
 
 '''
 Implementa uma solução inicial para o problema
@@ -267,13 +272,13 @@ def RVNS(prob_def, initial_solution, objective_function, max_iteration, historic
             historico.update(current_solution)
     return historico
 
-def BasicVNS(prob_def, initial_solution, objective_function, max_iteration, historico, kmax=3):
+def BasicVNS(prob_def, initial_solution, objective_function, max_iteration, historico, kmax=4):
     it = 0
     current_solution = initial_solution
     # Ciclo iterativo do método
     while it <= max_iteration:
         k = 1
-        while k < kmax:
+        while k <= kmax:
             # Gera uma solução candidata na k-ésima vizinhança de x
             new_solution = first_improvement(
                 x=current_solution,
