@@ -193,39 +193,37 @@ def shake(x: solution, k: int, prob_def: problem_definition):
     r_equipe = np.random.randint(prob_def.n_equipes)
     r_ativos = np.random.permutation(prob_def.n_ativos)
 
-    # trocando equipe de base - 3 vizinhos
+    # trocando ativo de equipe - 125 vizinhos
     if k == 1:
+        # worst_distances = np.where(prob_def.distance_matrix.loc[:,y.equipe_base] == prob_def.distance_matrix.loc[:,y.equipe_base].max())
+        # ativos, bases = worst_distances
+        r_ativo = r_ativos[0]
+        if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
+            y.ativo_equipe[r_ativo] = 0
+        else:
+            y.ativo_equipe[r_ativo] += 1
+
+    # trocando equipe de base - 3 vizinhos
+    elif k == 2:
         # y.solution[r[0]] = not(y.solution[r[0]])
         if y.equipe_base[r_equipe] == prob_def.n_bases - 1:
             y.equipe_base[r_equipe] = 0
         else:
             y.equipe_base[r_equipe] += 1
 
-    # trocando ativo de equipe - 125 vizinhos
-    elif k == 2:
-        # worst_distances = np.where(prob_def.distance_matrix.loc[:,y.equipe_base] == prob_def.distance_matrix.loc[:,y.equipe_base].max())
-        # ativos, bases = worst_distances
-        for i, r_ativo in enumerate(r_ativos):
-            if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
-                y.ativo_equipe[r_ativo] = 0
-            else:
-                y.ativo_equipe[r_ativo] += 1
-            if i >= 10:
-                break
+
 
     # trocando ativo de equipe e equipe de base - 1.953.125 vizinhos
     elif k == 3:
-        if y.equipe_base[r_equipe] == prob_def.n_bases - 1:
-            y.equipe_base[r_equipe] = 0
-        else:
-            y.equipe_base[r_equipe] += 1
-        for i, r_ativo in enumerate(r_ativos):
-            if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
-                y.ativo_equipe[r_ativo] = 0
-            else:
-                y.ativo_equipe[r_ativo] += 1
-            if i >= 30:
-                break
+        # if y.equipe_base[r_equipe] == prob_def.n_bases - 1:
+        y.equipe_base[r_equipe] = np.random.randint(prob_def.n_bases)
+        # for i, r_ativo in enumerate(r_ativos):
+        #     if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
+        #         y.ativo_equipe[r_ativo] = 0
+        #     else:
+        #         y.ativo_equipe[r_ativo] += 1
+        #     if i >= 30:
+        #         break
 
     # trocando ativo de equipe e equipe de base - 1.953.125 vizinhos
     elif k == 4:
