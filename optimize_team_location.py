@@ -210,10 +210,11 @@ def shake(x: solution, k: int, prob_def: problem_definition):
         # worst_distances = np.where(prob_def.distance_matrix.loc[:,y.equipe_base] == prob_def.distance_matrix.loc[:,y.equipe_base].max())
         # ativos, bases = worst_distances
         r_ativo = r_ativos[0]
-        if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
-            y.ativo_equipe[r_ativo] = 0
-        else:
-            y.ativo_equipe[r_ativo] += 1
+        y.ativo_equipe[r_ativo] = np.random.randint(prob_def.n_equipes)
+        # if y.ativo_equipe[r_ativo] == prob_def.n_equipes - 1:
+        #     y.ativo_equipe[r_ativo] = 0
+        # else:
+        #     y.ativo_equipe[r_ativo] += 1
 
     # trocando equipe de base - 3 vizinhos
     elif k == 2:
