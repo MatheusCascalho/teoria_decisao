@@ -164,6 +164,18 @@ def equilibrio_ativos(x: solution, prob_def: problem_definition):
 
     return x
 
+def minimiza_distancia_maxima(x: solution, prob_def: problem_definition):
+    distancias = []
+    for ativo, base in enumerate(x.ativo_base):
+        d = prob_def.distance_matrix.loc[ativo, base]
+        distancias.append(d)
+
+    x.fitness = max(distancias)
+    x.penalidade = get_penalidade(x, prob_def)
+
+    return x
+
+
 '''
 Implementa a função objetivo do problema
 '''
@@ -413,7 +425,7 @@ if __name__=="__main__":
         historico = BasicVNS(
             prob_def=prob_def,
             initial_solution=x,
-            objective_function=equilibrio_ativos,
+            objective_function=minimiza_distancia_maxima,
             max_iteration=max_num_sol_avaliadas,
             historico=historico
         )
