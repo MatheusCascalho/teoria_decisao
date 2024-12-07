@@ -419,7 +419,7 @@ if __name__=="__main__":
         num_sol_avaliadas += 1
 
         # Armazena dados para plot
-        historico = history()
+        historico = history(min_iterations=200)
         historico.update(x)
 
         historico = BasicVNS(
