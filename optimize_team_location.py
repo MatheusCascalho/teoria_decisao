@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pandas as pd
 import seaborn as sns
 
@@ -37,6 +39,7 @@ class solution:
     equipe_base: list # y
     fitness: float = 0
     penalidade: float = 0
+    multi_fitness: dict = field(default_factory=dict)
 
     @property
     def fitness_penalizado(self):
@@ -197,6 +200,37 @@ def minimiza_distancias(x: solution, prob_def: problem_definition):
     return x
 
 
+class WeightedSum:
+    def __init__(self, step=0.05):
+        self.step = step
+        self.weights = [1,0]
+        self.histories = []
+
+    def weighted_sum(self, x: solution, prob_def: problem_definition):
+        new_x = deepcopy(x)
+        f1 = minimiza_distancias(new_x, prob_def).fitness_penalizado
+        f2 = minimiza_distancia_maxima(new_x, prob_def).fitness_penalizado
+        min_f2 = prob_def.distance_matrix.min().min()
+        max_f2 = prob_def.distance_matrix.max().max()
+        min_f1 = sum(sorted(prob_def.distance_matrix.values.reshape((125*14)))[:prob_def.n_ativos])
+        max_f1 = sum(np.abs(sorted(prob_def.distance_matrix.values.reshape((125*14))*-1))[:prob_def.n_ativos])
+
+        f2_norm = (f2 - min_f2) / (max_f2 - min_f2)
+        f1_norm = (f1-min_f1)/(max_f1-min_f1)
+        fit = self.weights[0]*f1_norm + self.weights[1]*f2_norm
+
+        new_x.fitness = fit
+        new_x.multi_fitness = {"f1": f1, "f2": f2, "pond": fit}
+        new_x.penalidade = get_penalidade(new_x, prob_def)
+        return new_x
+
+    def balance(self):
+        self.weights[0] -= self.step
+        self.weights[1] += self.step
+        if self.weights[1]>1:
+            raise Exception('All weights tried')
+
+
 '''
 Implementa a função shake
 '''
@@ -277,7 +311,7 @@ Implementa a função neighborhoodChange
 '''
 def neighborhoodChange(x, y, k):
     if y.fitness_penalizado < x.fitness_penalizado:
-        x = copy.deepcopy(y)
+        x = deepcopy(y)
         k = 1
     else:
         k += 1
@@ -362,14 +396,14 @@ def get_problem_definition():
     return prob_def
 
 
-def optimize(fobj, apply_constructive_heuristic=False):
+def optimize(fobj, apply_constructive_heuristic=False, max_it=40e3):
     historicos = []
     for _ in range(5):
         # Contador do número de soluções candidatas avaliadas
         num_sol_avaliadas = 0
 
         # Máximo número de soluções candidatas avaliadas
-        max_num_sol_avaliadas = 40e3
+        max_num_sol_avaliadas = max_it
 
         # Faz a leitura dos dados da instância do problema
         prob_def = get_problem_definition()
@@ -382,7 +416,7 @@ def optimize(fobj, apply_constructive_heuristic=False):
         num_sol_avaliadas += 1
 
         # Armazena dados para plot
-        historico = history()
+        historico = history(min_iterations=max_it)
         historico.update(x)
 
         historico = BasicVNS(
@@ -395,6 +429,25 @@ def optimize(fobj, apply_constructive_heuristic=False):
         historicos.append(historico)
     return historicos
 
+def multiobjective_weighted(prob_def, initial_solution, max_iteration, historico):
+    ws = WeightedSum()
+    while True:
+        # Armazena dados para plot
+        historico = history(min_iterations=200)
+        historico.update(deepcopy(initial_solution))
+        historico = BasicVNS(
+            prob_def=prob_def,
+            initial_solution=deepcopy(initial_solution),
+            objective_function=ws.weighted_sum,
+            max_iteration=max_iteration,
+            historico=historico
+        )
+        ws.histories.append(historico)
+        try:
+            ws.balance()
+        except:
+            break
+    return ws
 
 if __name__=="__main__":
 
@@ -404,7 +457,7 @@ if __name__=="__main__":
         num_sol_avaliadas = 0
 
         # Máximo número de soluções candidatas avaliadas
-        max_num_sol_avaliadas = 5000
+        max_num_sol_avaliadas = 100
 
         # Número de estruturas de vizinhanças definidas
         kmax = 3
@@ -413,7 +466,7 @@ if __name__=="__main__":
         prob_def = get_problem_definition()
 
         # Gera solução inicial
-        x = sol_inicial(prob_def, apply_constructive_heuristic=True, use_random=False)
+        x = sol_inicial(prob_def, apply_constructive_heuristic=False, use_random=False)
 
         # Avalia solução inicial
         x = equilibrio_ativos(x, prob_def)
@@ -423,11 +476,19 @@ if __name__=="__main__":
         historico = history(min_iterations=200)
         historico.update(x)
 
-        historico = BasicVNS(
+        # historico = BasicVNS(
+        #     prob_def=prob_def,
+        #     initial_solution=x,
+        #     objective_function=minimiza_distancia_maxima,
+        #     max_iteration=max_num_sol_avaliadas,
+        #     historico=historico
+        # )
+        historico = multiobjective_weighted(
             prob_def=prob_def,
             initial_solution=x,
-            objective_function=minimiza_distancia_maxima,
             max_iteration=max_num_sol_avaliadas,
             historico=historico
         )
-        historicos.append(historico)
+        df = pd.DataFrame([h.best_solution.multi_fitness for h in historico.histories])
+        print(df)
+        # historicos.append(historico)
