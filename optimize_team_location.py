@@ -396,7 +396,7 @@ def get_problem_definition():
     return prob_def
 
 
-def optimize(fobj, apply_constructive_heuristic=False, max_it=40e3):
+def optimize(fobj, apply_constructive_heuristic=False, max_it=40e3, follow_optimizitation=False):
     historicos = []
     for _ in range(5):
         # Contador do número de soluções candidatas avaliadas
@@ -427,9 +427,25 @@ def optimize(fobj, apply_constructive_heuristic=False, max_it=40e3):
             historico=historico
         )
         historicos.append(historico)
+        if follow_optimizitation:
+            fig, (ax1, ax2) = plt.subplots(2, 1)
+            s = len(historico.fit_pen)
+            ax1.plot(np.linspace(0, s - 1, s), historico.fit_pen, 'k-')
+            ax2.plot(np.linspace(0, s - 1, s), historico.pen, 'b:')
+            fig.suptitle('Evolução da qualidade da solução candidata')
+            ax1.set_ylabel('fitness(x) penalizado')
+            ax2.set_ylabel('penalidade(x)')
+            ax2.set_xlabel('Número de avaliações')
+            plt.subplots_adjust(left=0.1,
+                                bottom=0.1,
+                                right=0.9,
+                                top=0.9,
+                                wspace=0.4,
+                                hspace=0.4)
+            plt.show()
     return historicos
 
-def multiobjective_weighted(prob_def, initial_solution, max_iteration, historico):
+def multiobjective_weighted(prob_def, max_iteration, follow_optimizitation):
     ws = WeightedSum()
     while True:
         # Armazena dados para plot
@@ -442,6 +458,22 @@ def multiobjective_weighted(prob_def, initial_solution, max_iteration, historico
             max_iteration=max_iteration,
             historico=historico
         )
+        if follow_optimizitation:
+            fig, (ax1, ax2) = plt.subplots(2, 1)
+            s = len(historico.fit_pen)
+            ax1.plot(np.linspace(0, s - 1, s), historico.fit_pen, 'k-')
+            ax2.plot(np.linspace(0, s - 1, s), historico.pen, 'b:')
+            fig.suptitle('Evolução da qualidade da solução candidata')
+            ax1.set_ylabel('fitness(x) penalizado')
+            ax2.set_ylabel('penalidade(x)')
+            ax2.set_xlabel('Número de avaliações')
+            plt.subplots_adjust(left=0.1,
+                                bottom=0.1,
+                                right=0.9,
+                                top=0.9,
+                                wspace=0.4,
+                                hspace=0.4)
+            plt.show()
         ws.histories.append(historico)
         try:
             ws.balance()
@@ -487,7 +519,7 @@ if __name__=="__main__":
             prob_def=prob_def,
             initial_solution=x,
             max_iteration=max_num_sol_avaliadas,
-            historico=historico
+            follow_optimizitation=True
         )
         df = pd.DataFrame([h.best_solution.multi_fitness for h in historico.histories])
         print(df)
