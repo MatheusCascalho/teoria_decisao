@@ -448,8 +448,15 @@ def optimize(fobj, apply_constructive_heuristic=False, max_it=40e3, follow_optim
 def multiobjective_weighted(prob_def, max_iteration, follow_optimizitation):
     ws = WeightedSum()
     while True:
+        # Gera solução inicial
+        initial_solution = sol_inicial(prob_def, apply_constructive_heuristic=False, use_random=False)
+
+        # Avalia solução inicial
+        initial_solution = ws.weighted_sum(initial_solution, prob_def)
+
         # Armazena dados para plot
-        historico = history(min_iterations=200)
+        historico = history(min_iterations=max_iteration)
+        historico.update(initial_solution)
         historico.update(deepcopy(initial_solution))
         historico = BasicVNS(
             prob_def=prob_def,
@@ -481,46 +488,45 @@ def multiobjective_weighted(prob_def, max_iteration, follow_optimizitation):
             break
     return ws
 
-if __name__=="__main__":
-
-    historicos = []
+def get_ws_multiobjective(max_num_sol_avaliadas=100):
+    borders = []
     for _ in range(3):
-        # Contador do número de soluções candidatas avaliadas
-        num_sol_avaliadas = 0
-
-        # Máximo número de soluções candidatas avaliadas
-        max_num_sol_avaliadas = 100
-
-        # Número de estruturas de vizinhanças definidas
-        kmax = 3
-
         # Faz a leitura dos dados da instância do problema
         prob_def = get_problem_definition()
 
-        # Gera solução inicial
-        x = sol_inicial(prob_def, apply_constructive_heuristic=False, use_random=False)
-
-        # Avalia solução inicial
-        x = equilibrio_ativos(x, prob_def)
-        num_sol_avaliadas += 1
-
-        # Armazena dados para plot
-        historico = history(min_iterations=200)
-        historico.update(x)
-
-        # historico = BasicVNS(
-        #     prob_def=prob_def,
-        #     initial_solution=x,
-        #     objective_function=minimiza_distancia_maxima,
-        #     max_iteration=max_num_sol_avaliadas,
-        #     historico=historico
-        # )
-        historico = multiobjective_weighted(
+        border = multiobjective_weighted(
             prob_def=prob_def,
-            initial_solution=x,
             max_iteration=max_num_sol_avaliadas,
             follow_optimizitation=True
         )
-        df = pd.DataFrame([h.best_solution.multi_fitness for h in historico.histories])
-        print(df)
-        # historicos.append(historico)
+        borders.append(border)
+    return borders
+
+def is_dominated(sol_a, sol_b):
+    """Verifica se sol_a é dominada por sol_b."""
+    is_not_worse_in_all = all(a >= b for a, b in zip(sol_a, sol_b))
+    is_strictly_worse_in_at_least_one = any(a > b for a, b in zip(sol_a, sol_b))
+    return is_not_worse_in_all and is_strictly_worse_in_at_least_one
+
+
+def find_non_dominated_solutions(df):
+    """Identifica as soluções não dominadas."""
+    non_dominated = []
+    for i, sol_a in df.iterrows():
+        dominated = False
+        for j, sol_b in df.iterrows():
+            if i != j and is_dominated(sol_a, sol_b):
+                dominated = True
+                break
+        if not dominated:
+            non_dominated.append(i)
+    return df.iloc[non_dominated]
+
+# Identificar as soluções não dominadas
+non_dominated_solutions = find_non_dominated_solutions(df_unique)
+
+if __name__=='__main__':
+    historico = get_ws_multiobjective()
+    # historicos_f1 = optimize(minimiza_distancias, max_it=500, follow_optimizitation=True)
+    # for historico in historicos_f1:
+    #     plt.plot(historico.fit)
