@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 from sklearn.cluster import KMeans
-
+from tqdm import tqdm
 
 '''
 Define um tipo de dado similar ao Pascal "record" or C "struct"
@@ -341,7 +341,7 @@ def BasicVNS(prob_def, initial_solution, objective_function, max_iteration, hist
     it = 0
     current_solution = initial_solution
     # Ciclo iterativo do método
-    while it <= max_iteration:
+    for it in tqdm(range(max_iteration)):
         k = 1
         while k <= kmax:
             # Gera uma solução candidata na k-ésima vizinhança de x
@@ -352,7 +352,7 @@ def BasicVNS(prob_def, initial_solution, objective_function, max_iteration, hist
                 prob_def=prob_def
             )
             new_solution = objective_function(new_solution, prob_def)
-            it += 1
+            # it += 1
 
             # Atualiza solução corrente e estrutura de vizinhança (se necessário)
             current_solution, k = neighborhoodChange(current_solution, new_solution, k)
