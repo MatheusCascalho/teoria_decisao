@@ -220,7 +220,7 @@ class WeightedSum:
         fit = self.weights[0]*f1_norm + self.weights[1]*f2_norm
 
         new_x.fitness = fit
-        new_x.multi_fitness = {"f1": f1, "f2": f2, "pond": fit}
+        new_x.multi_fitness = {"f1": f1, "f2": f2, "pond": fit, "f1_norm": f1_norm, "f2_norm": f2_norm}
         new_x.penalidade = get_penalidade(new_x, prob_def)
         return new_x
 
