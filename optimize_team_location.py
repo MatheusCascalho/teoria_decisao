@@ -20,7 +20,8 @@ class Struct:
 
 
 from dataclasses import dataclass, field
-
+np.random.seed(11)
+prob_falha = np.abs(np.random.normal(size=125))
 
 @dataclass
 class problem_definition:
@@ -32,6 +33,13 @@ class problem_definition:
     n_equipes: int = 3  # Quantidade de equipes
     n_ativos: int = 125
     n_bases: int = 14
+    prob_falha: list = field(default_factory=list)
+
+    def __post_init__(self):
+        if len(self.prob_falha)==0:
+            total = self.distance_matrix.sum().sum()
+            max_distance = 1
+            self.prob_falha = prob_falha
 
 @dataclass
 class solution:
@@ -178,6 +186,17 @@ def minimiza_distancia_maxima(x: solution, prob_def: problem_definition):
 
     return x
 
+def minimiza_distancia_para_falha(x: solution, prob_def: problem_definition):
+    distancias = []
+    for ativo, base in enumerate(x.ativo_base):
+        d = prob_def.distance_matrix.loc[ativo, base] * prob_def.prob_falha[ativo]
+        distancias.append(d)
+
+    x.fitness = sum(distancias)
+    x.penalidade = get_penalidade(x, prob_def)
+
+    return x
+
 
 '''
 Implementa a função objetivo do problema
@@ -209,13 +228,13 @@ class WeightedSum:
     def weighted_sum(self, x: solution, prob_def: problem_definition):
         new_x = deepcopy(x)
         f1 = minimiza_distancias(new_x, prob_def).fitness_penalizado
-        f2 = minimiza_distancia_maxima(new_x, prob_def).fitness_penalizado
+        f2 = minimiza_distancia_para_falha(new_x, prob_def).fitness_penalizado
         min_f2 = prob_def.distance_matrix.min().min()
         max_f2 = prob_def.distance_matrix.max().max()
         min_f1 = sum(sorted(prob_def.distance_matrix.values.reshape((125*14)))[:prob_def.n_ativos])
         max_f1 = sum(np.abs(sorted(prob_def.distance_matrix.values.reshape((125*14))*-1))[:prob_def.n_ativos])
 
-        f2_norm = (f2 - min_f2) / (max_f2 - min_f2)
+        f2_norm = (f2 - min_f1) / (max_f1 - min_f1)
         f1_norm = (f1-min_f1)/(max_f1-min_f1)
         fit = self.weights[0]*f1_norm + self.weights[1]*f2_norm
 
@@ -341,7 +360,7 @@ def BasicVNS(prob_def, initial_solution, objective_function, max_iteration, hist
     it = 0
     current_solution = initial_solution
     # Ciclo iterativo do método
-    for it in tqdm(range(max_iteration)):
+    for it in tqdm(range(max_iteration), desc='Refinamento BVNS'):
         k = 1
         while k <= kmax:
             # Gera uma solução candidata na k-ésima vizinhança de x
@@ -385,13 +404,16 @@ def get_problem_definition():
     distance_matrix = data.set_index(['ativo', 'base'])[['Distância']].unstack(1).fillna(0)
     distance_matrix.columns = distance_matrix.columns.droplevel(0)
 
+    prob_falha = pd.read_excel('probfalhaativos.xlsx')
+
     prob_def = problem_definition(
         base_map=bases_map,
         ativo_map=ativos_map,
         n_bases=len(bases_map),
         n_ativos=len(ativos_map),  # Número de ativos,
         n_equipes=3,
-        distance_matrix=distance_matrix
+        distance_matrix=distance_matrix,
+        prob_falha=prob_falha['prob'].values
     )
     return prob_def
 
@@ -488,9 +510,9 @@ def multiobjective_weighted(prob_def, max_iteration, follow_optimizitation):
             break
     return ws
 
-def get_ws_multiobjective(max_num_sol_avaliadas=100):
+def get_ws_multiobjective(max_num_sol_avaliadas=100, tests=5):
     borders = []
-    for _ in range(3):
+    for _ in tqdm(range(tests), desc=f'Teste - construção de fronteiras'):
         # Faz a leitura dos dados da instância do problema
         prob_def = get_problem_definition()
 
@@ -522,11 +544,19 @@ def find_non_dominated_solutions(df):
             non_dominated.append(i)
     return df.iloc[non_dominated]
 
-# Identificar as soluções não dominadas
-non_dominated_solutions = find_non_dominated_solutions(df_unique)
+# # Identificar as soluções não dominadas
+# non_dominated_solutions = find_non_dominated_solutions(df_unique)
 
 if __name__=='__main__':
-    historico = get_ws_multiobjective()
-    # historicos_f1 = optimize(minimiza_distancias, max_it=500, follow_optimizitation=True)
+    fronteiras = get_ws_multiobjective(max_num_sol_avaliadas=int(2e3), tests=5)
+    import pickle
+
+    # Salvando em um arquivo pickle
+    with open("fronteiras_prob_falha.pkl", "wb") as pickle_file:
+        pickle.dump(fronteiras, pickle_file)
+
+    print("Dados salvos em data.pkl")
+
+    # historicos_f1 = optimize(minimiza_distancia_para_falha, max_it=500, follow_optimizitation=True)
     # for historico in historicos_f1:
     #     plt.plot(historico.fit)
