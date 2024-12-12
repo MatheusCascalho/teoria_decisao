@@ -248,6 +248,110 @@ class WeightedSum:
         self.weights[1] += self.step
         if self.weights[1]>1:
             raise Exception('All weights tried')
+        
+class EpsilonConstraint:
+    def __init__(self, epsilon_values, objective_index=0):
+        """
+        Classe para aplicar o método ε-restrito.
+
+        Parameters:
+            epsilon_values (list): Lista de valores ε para restringir os objetivos secundários.
+            objective_index (int): Índice do objetivo a ser minimizado diretamente.
+        """
+        self.epsilon_values = epsilon_values
+        self.objective_index = objective_index
+
+    def epsilon_constrained_function(self, x, prob_def, objectives):
+        """
+        Função objetivo para ε-restrito com penalidades para violações de restrições.
+
+        Parameters:
+            x (solution): Solução a ser avaliada.
+            prob_def (problem_definition): Definição do problema.
+            objectives (list): Lista de funções objetivo.
+
+        Returns:
+            solution: Solução avaliada com penalidades aplicadas.
+        """
+        primary_objective = objectives[self.objective_index](deepcopy(x), prob_def).fitness
+        penalties = 0
+
+        for i, obj_fn in enumerate(objectives):
+            if i != self.objective_index:
+                value = obj_fn(deepcopy(x), prob_def).fitness
+                if value > self.epsilon_values[i - 1]:
+                    penalties += (value - self.epsilon_values[i - 1]) ** 2
+
+        x.fitness = primary_objective
+        x.penalidade = penalties
+
+        return x
+
+
+def run_epsilon_restricted(prob_def, objectives, epsilon_ranges, max_iteration=2000, tests=5):
+    """
+    Executa a abordagem ε-restrito para gerar soluções multiobjetivo.
+
+    Parameters:
+        prob_def (problem_definition): Definição do problema.
+        objectives (list): Lista de funções objetivo.
+        epsilon_ranges (list): Intervalos de ε para restringir os objetivos secundários.
+        max_iteration (int): Número máximo de iterações.
+        tests (int): Número de testes a serem realizados.
+
+    Returns:
+        list: Lista de fronteiras Pareto geradas em cada execução.
+    """
+    pareto_fronts = []
+
+    for _ in range(tests):
+        epsilon_values = [np.linspace(start, end, 20) for start, end in epsilon_ranges]
+        epsilon_values = np.array(epsilon_values).T
+
+        solutions = []
+
+        for eps_set in epsilon_values:
+            epsilon_constraint = EpsilonConstraint(eps_set, objective_index=0)
+            
+            initial_solution = sol_inicial(prob_def)
+            initial_solution = epsilon_constraint.epsilon_constrained_function(initial_solution, prob_def, objectives)
+
+            historico = history(min_iterations=max_iteration)
+            historico.update(initial_solution)
+
+            historico = BasicVNS(
+                prob_def=prob_def,
+                initial_solution=initial_solution,
+                objective_function=lambda x, p: epsilon_constraint.epsilon_constrained_function(x, p, objectives),
+                max_iteration=max_iteration,
+                historico=historico
+            )
+
+            solutions.append(deepcopy(historico.best_solution))
+
+        pareto_fronts.append(solutions)
+
+    return pareto_fronts
+
+def plot_pareto_fronts(pareto_fronts, title="Fronteiras Pareto - Método ε-restrito"):
+    """
+    Plota as fronteiras Pareto estimadas.
+
+    Parameters:
+        pareto_fronts (list): Fronteiras Pareto geradas.
+        title (str): Título do gráfico.
+    """
+    plt.figure(figsize=(10, 6))
+    for front in pareto_fronts:
+        f1 = [solution.multi_fitness['f1'] for solution in front]
+        f2 = [solution.multi_fitness['f2'] for solution in front]
+        plt.scatter(f1, f2, label="Fronteira Pareto")
+    plt.title(title)
+    plt.xlabel("f1(x)")
+    plt.ylabel("f2(x)")
+    plt.legend()
+    plt.grid()
+    plt.show()
 
 
 '''
@@ -547,16 +651,70 @@ def find_non_dominated_solutions(df):
 # # Identificar as soluções não dominadas
 # non_dominated_solutions = find_non_dominated_solutions(df_unique)
 
-if __name__=='__main__':
-    fronteiras = get_ws_multiobjective(max_num_sol_avaliadas=int(2e3), tests=5)
-    import pickle
+#if __name__=='__main__':
+    #fronteiras = get_ws_multiobjective(max_num_sol_avaliadas=int(2e3), tests=5)
+    #import pickle
 
     # Salvando em um arquivo pickle
-    with open("fronteiras_prob_falha.pkl", "wb") as pickle_file:
-        pickle.dump(fronteiras, pickle_file)
+    #with open("fronteiras_prob_falha.pkl", "wb") as pickle_file:
+    #    pickle.dump(fronteiras, pickle_file)
 
-    print("Dados salvos em data.pkl")
+    #print("Dados salvos em data.pkl")
 
     # historicos_f1 = optimize(minimiza_distancia_para_falha, max_it=500, follow_optimizitation=True)
     # for historico in historicos_f1:
     #     plt.plot(historico.fit)
+
+if __name__ == '__main__':
+    # Soma Ponderada
+    fronteiras_ws = get_ws_multiobjective(max_num_sol_avaliadas=int(2e3), tests=5)
+    import pickle
+
+    # Salvando resultados da soma ponderada
+    with open("fronteiras_ws.pkl", "wb") as pickle_file:
+        pickle.dump(fronteiras_ws, pickle_file)
+    print("Fronteiras da soma ponderada salvas em fronteiras_ws.pkl")
+    
+    # Epsilon-restrito
+    prob_def = get_problem_definition()
+    objectives = [minimiza_distancias, minimiza_distancia_para_falha]
+    epsilon_ranges = [(0, 10), (0, 10)]  # Intervalos de ε para os objetivos
+    
+    fronteiras_eps = run_epsilon_restricted(
+        prob_def=prob_def,
+        objectives=objectives,
+        epsilon_ranges=epsilon_ranges,
+        max_iteration=2000,
+        tests=5
+    )
+    
+    # Salvando resultados do epsilon-restrito
+    with open("fronteiras_eps.pkl", "wb") as pickle_file:
+        pickle.dump(fronteiras_eps, pickle_file)
+    print("Fronteiras do ε-restrito salvas em fronteiras_eps.pkl")
+    
+    # Visualizar ambas as fronteiras
+    def plot_fronteiras_duplas(fronteiras_ws, fronteiras_eps):
+        plt.figure(figsize=(12, 8))
+        
+        # Fronteiras da soma ponderada
+        for front in fronteiras_ws:
+            f1 = [solution.multi_fitness['f1'] for solution in front]
+            f2 = [solution.multi_fitness['f2'] for solution in front]
+            plt.scatter(f1, f2, label="Soma Ponderada", alpha=0.7, color='blue')
+        
+        # Fronteiras do epsilon-restrito
+        for front in fronteiras_eps:
+            f1 = [solution.multi_fitness['f1'] for solution in front]
+            f2 = [solution.multi_fitness['f2'] for solution in front]
+            plt.scatter(f1, f2, label="ε-restrito", alpha=0.7, color='red')
+        
+        plt.title("Fronteiras Pareto Estimadas")
+        plt.xlabel("f1(x)")
+        plt.ylabel("f2(x)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+    
+    # Chamar a função de plotagem
+    plot_fronteiras_duplas(fronteiras_ws, fronteiras_eps)
