@@ -260,6 +260,7 @@ class EpsilonConstraint:
         """
         self.epsilon_values = epsilon_values
         self.objective_index = objective_index
+        self.epsilon = self.epsilon_values[0]
 
     def epsilon_constrained_function(self, x, prob_def, objectives):
         """
@@ -274,21 +275,27 @@ class EpsilonConstraint:
             solution: Solução avaliada com penalidades aplicadas.
         """
         primary_objective = objectives[self.objective_index](deepcopy(x), prob_def).fitness
-        penalties = 0
+        secund_objective = objectives[self.objective_index+1](deepcopy(x), prob_def).fitness - self.epsilon
+        # penalties = 0
+        u = 100
 
-        for i, obj_fn in enumerate(objectives):
-            if i != self.objective_index:
-                value = obj_fn(deepcopy(x), prob_def).fitness
-                if value > self.epsilon_values[i - 1]:
-                    penalties += (value - self.epsilon_values[i - 1]) ** 2
+        secund_objective = u * max(0, secund_objective)**2
+
+        #  u * max(
+
+        # for i, obj_fn in enumerate(objectives):
+        #     if i != self.objective_index:
+        #         value = obj_fn(deepcopy(x), prob_def).fitness
+        #         if value > self.epsilon_values[i - 1]:
+        #             penalties += (value - self.epsilon_values[i - 1]) ** 2
 
         x.fitness = primary_objective
-        x.penalidade = penalties
+        x.penalidade = secund_objective
 
         return x
 
 
-def run_epsilon_restricted(prob_def, objectives, epsilon_ranges, max_iteration=2000, tests=5):
+def run_epsilon_restricted(prob_def, objectives, epsilon_ranges, follow_optimizitation, max_iteration=2000, tests=5):
     """
     Executa a abordagem ε-restrito para gerar soluções multiobjetivo.
 
@@ -305,14 +312,13 @@ def run_epsilon_restricted(prob_def, objectives, epsilon_ranges, max_iteration=2
     pareto_fronts = []
 
     for _ in range(tests):
-        epsilon_values = [np.linspace(start, end, 20) for start, end in epsilon_ranges]
-        epsilon_values = np.array(epsilon_values).T
+        epsilon_values = np.linspace(epsilon_ranges[0], epsilon_ranges[1], 350)
 
         solutions = []
+        epsilon_constraint = EpsilonConstraint(epsilon_values, objective_index=0)
 
-        for eps_set in epsilon_values:
-            epsilon_constraint = EpsilonConstraint(eps_set, objective_index=0)
-            
+        for epsilon in epsilon_values:
+            epsilon_constraint.epsilon = epsilon
             initial_solution = sol_inicial(prob_def)
             initial_solution = epsilon_constraint.epsilon_constrained_function(initial_solution, prob_def, objectives)
 
@@ -326,6 +332,23 @@ def run_epsilon_restricted(prob_def, objectives, epsilon_ranges, max_iteration=2
                 max_iteration=max_iteration,
                 historico=historico
             )
+
+            if follow_optimizitation:
+                fig, (ax1, ax2) = plt.subplots(2, 1)
+                s = len(historico.fit_pen)
+                ax1.plot(np.linspace(0, s - 1, s), historico.fit_pen, 'k-')
+                ax2.plot(np.linspace(0, s - 1, s), historico.pen, 'b:')
+                fig.suptitle('Evolução da qualidade da solução candidata')
+                ax1.set_ylabel('fitness(x) penalizado')
+                ax2.set_ylabel('penalidade(x)')
+                ax2.set_xlabel('Número de avaliações')
+                plt.subplots_adjust(left=0.1,
+                                    bottom=0.1,
+                                    right=0.9,
+                                    top=0.9,
+                                    wspace=0.4,
+                                    hspace=0.4)
+                plt.show()
 
             solutions.append(deepcopy(historico.best_solution))
 
@@ -667,7 +690,7 @@ def find_non_dominated_solutions(df):
 
 if __name__ == '__main__':
     # Soma Ponderada
-    fronteiras_ws = get_ws_multiobjective(max_num_sol_avaliadas=int(2e3), tests=5)
+    fronteiras_ws = get_ws_multiobjective(max_num_sol_avaliadas=int(2), tests=5)
     import pickle
 
     # Salvando resultados da soma ponderada
@@ -678,13 +701,14 @@ if __name__ == '__main__':
     # Epsilon-restrito
     prob_def = get_problem_definition()
     objectives = [minimiza_distancias, minimiza_distancia_para_falha]
-    epsilon_ranges = [(0, 10), (0, 10)]  # Intervalos de ε para os objetivos
+    epsilon_ranges = [300, 7000]  # Intervalos de ε para os objetivos
     
     fronteiras_eps = run_epsilon_restricted(
         prob_def=prob_def,
         objectives=objectives,
         epsilon_ranges=epsilon_ranges,
-        max_iteration=2000,
+        follow_optimizitation=True,
+        max_iteration=2,
         tests=5
     )
     
